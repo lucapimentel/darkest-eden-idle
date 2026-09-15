@@ -1,0 +1,18 @@
+# Purchased assets: licensed for use in the game, not for redistribution in a public repo
+assets-src/
+node_modules/
+dist/
+apps/web/public/assets/
+docs/
+CLAUDE.md
+AGENTS.md
+CONTEXT.md
+PLAN.md
+.claude/
+.cursor/
+.cursorrules
+.windsurfrules
+.aider*
+.github/copilot-instructions.md
+.env
+*.zip
