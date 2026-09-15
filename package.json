@@ -7,6 +7,10 @@
         "packages/*"
     ],
     "scripts": {
+        "dev:server": "npm run dev -w @dei/server",
+        "dev:web": "npm run dev -w @dei/web",
+        "test": "node --test",
+        "typecheck": "npm run typecheck -w @dei/game -w @dei/server && npm run build -w @dei/web",
         "assets": "node tools/copy-assets.ts"
     },
     "devDependencies": {
