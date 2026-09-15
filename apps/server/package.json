@@ -1,0 +1,13 @@
+{
+    "name": "@dei/server",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "node --watch src/index.ts",
+        "typecheck": "tsc -p ."
+    },
+    "dependencies": {
+        "@dei/game": "*",
+        "fastify": "^5.12.4"
+    }
+}
