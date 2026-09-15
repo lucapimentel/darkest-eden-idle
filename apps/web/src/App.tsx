@@ -24,6 +24,7 @@ function App() {
       <p>server roll: {serverRoll}</p>
       <p>browser roll: {browserRoll}</p>
       <p>{serverRoll === browserRoll ? '✅ same code, same result' : '…'}</p>
+      <img src="/assets/heroes/spritesheets/1Knight/Idle.png" width="480" />
     </main>
   )
 }
