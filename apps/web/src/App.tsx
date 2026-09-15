@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { mulberry32 } from "@dei/game"
-import './App.css'
 
 function App() {
   const [server, setServer] = useState('checking...');
@@ -24,7 +23,6 @@ function App() {
       <p>server roll: {serverRoll}</p>
       <p>browser roll: {browserRoll}</p>
       <p>{serverRoll === browserRoll ? '✅ same code, same result' : '…'}</p>
-      <img src="/assets/heroes/spritesheets/1Knight/Idle.png" width="480" />
     </main>
   )
 }

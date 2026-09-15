@@ -14,7 +14,7 @@
         "assets": "node tools/copy-assets.ts"
     },
     "devDependencies": {
-        "@types/node": "^26.5.1",
-        "typescript": "^7.0.2"
+        "@types/node": "^24.13.4",
+        "typescript": "~6.0.2"
     }
 }
