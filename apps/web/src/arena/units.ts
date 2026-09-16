@@ -1,0 +1,1 @@
+export type State = 'idle' | 'run' | 'attack' | 'cleave' | 'hurt' | 'dead'
