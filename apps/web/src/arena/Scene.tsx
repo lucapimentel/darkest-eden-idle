@@ -31,7 +31,7 @@ export function Scene() {
             if (!currentWorld) return
             currentWorld.root.position.set(app.screen.width / 2, app.screen.height / 2)
             currentWorld.update(ticker.deltaMS)
-        }, [])
+        }, [app])
     )
 
     return null

@@ -1,5 +1,6 @@
 import { Container, Sprite } from 'pixi.js'
 import { COLUMNS, DIRECTIONS, FPS } from './sheet.ts'
+import { bakeGround } from "./ground.ts"
 import { loadTextures } from './textures'
 
 
@@ -13,6 +14,7 @@ const FRAME_MS = 1000 / FPS // 100ms per frame at 10fps
 
 export function createWorld(textures: Textures): World {
     const root = new Container();
+    root.addChild(bakeGround(textures.tiles, 14, 7))
     const idle = textures.knight.idle;
 
     const knights = DIRECTIONS.map((_, row) => {

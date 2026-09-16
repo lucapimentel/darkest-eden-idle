@@ -49,11 +49,12 @@ async function loadUnit<K extends string>(dir: string, files: Record<K, string>)
 }
 
 export async function loadTextures() {
-    const [knight, warrior, archer] = await Promise.all([
+    const [knight, warrior, archer, tiles] = await Promise.all([
         loadUnit('/assets/heroes/spritesheets/1Knight', KNIGHT_ANIMS),
         loadUnit('/assets/enemies/undead/spritesheets/6Warrior', ENEMY_ANIMS),
         loadUnit('/assets/enemies/undead/spritesheets/5Archer', ENEMY_ANIMS),
+        Assets.load<Texture>('/assets/environment/tiles/tiles_brown_01.png'),
     ])
 
-    return { knight, warrior, archer }
+    return { knight, warrior, archer, tiles }
 }
