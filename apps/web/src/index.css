@@ -62,6 +62,56 @@ canvas {
   background: var(--gold);
 }
 
+.hud .account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hud .account button { margin-top: 0; }
+
+/* --- Login: the other of the two screens, with no canvas behind it --- */
+.login {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.login h1 { margin: 0 0 8px; font-size: 1.6rem; }
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(300px, 82vw);
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  padding: 20px;
+}
+
+.login label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.login input {
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: #0f0c0a;
+  border: 1px solid var(--edge);
+  padding: 6px 8px;
+}
+
+.login button[type='submit'] { margin-top: 4px; }
+
 .badge {
   display: inline-block;
   margin-left: 6px;

@@ -5,10 +5,12 @@ import { heroStats, levelFromXp, xpForLevel, xpToNext, type SaveState } from '@d
  * Everything here is read from the save — the Arena no longer keeps counters of its own
  * (DEI-033). Only the fps is polled, because it is the one number the loop owns.
  */
-export function Hud({ save, fpsRef, onOpenInventory }: {
+export function Hud({ save, fpsRef, email, onOpenInventory, onLogout }: {
     save: SaveState
     fpsRef: { current: number }
+    email: string
     onOpenInventory: () => void
+    onLogout: () => void
 }) {
     const [shownFps, setShownFps] = useState(0)
     useEffect(() => {
@@ -42,6 +44,10 @@ export function Hud({ save, fpsRef, onOpenInventory }: {
                 </p>
             )}
             <p><small>{Math.round(shownFps)} fps</small></p>
+            <p className="account">
+                <small>{email}</small>
+                <button type="button" className="ghost" onClick={onLogout}>Log out</button>
+            </p>
         </aside>
     )
 }

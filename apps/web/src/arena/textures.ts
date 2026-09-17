@@ -55,16 +55,50 @@ export async function loadFrames(dir: string, count = 15): Promise<Texture[]> {
     return urls.map((url) => loaded[url])
 }
 
+interface Cell { x: number; y: number; w: number; h: number }
+
+/**
+ * Tile sheets do not share a layout (brown_01 has 5 rows with gaps, green_01 has 7, grey_01 has
+ * 3), so the cell rects come from tiles.json, which tools/copy-assets.ts generates from each
+ * sheet's Unity .meta. Nothing here hardcodes a grid.
+ */
+async function loadTiles(file: string): Promise<Texture[]> {
+    const [sheet, cells] = await Promise.all([
+        Assets.load<Texture>(`/assets/${file}`),
+        Assets.load<Record<string, Cell[]>>('/assets/environment/tiles/tiles.json'),
+    ])
+    return cells[file].map(({ x, y, w, h }) =>
+        new Texture({ source: sheet.source, frame: new Rectangle(x, y, w, h) }))
+}
+
+// DEI-034: town props. Order does not matter; the layout picks from them at random per Stage.
+const TOWN_PROPS = [
+    'crypt/crypt_1', 'crypt/crypt_2', 'crypt/crypt_3',
+    'dungeon/dungeon_1', 'dungeon/dungeon_2',
+    'forge/forge_1', 'forge/forge_2', 'forge/forge_3',
+    'camp/camp_1', 'camp/camp_2',
+    'ramparts/ramparts_1', 'ramparts/ramparts_2', 'ramparts/ramparts_3',
+    'soul_well/soul_well_1',
+    'trees/trees_01', 'trees/trees_05', 'trees/trees_09', 'trees/trees_14',
+]
+
+async function loadTown(): Promise<Texture[]> {
+    const urls = TOWN_PROPS.map((name) => `/assets/environment/buildings/${name}.png`)
+    const loaded = await Assets.load<Texture>(urls)
+    return urls.map((url) => loaded[url])
+}
+
 export async function loadTextures() {
-    const [knight, warrior, archer, tiles, arrow, swordAoE, light] = await Promise.all([
+    const [knight, warrior, archer, tiles, town, arrow, swordAoE, light] = await Promise.all([
         loadUnit('/assets/heroes/spritesheets/1Knight', KNIGHT_ANIMS),
         loadUnit('/assets/enemies/undead/spritesheets/6Warrior', ENEMY_ANIMS),
         loadUnit('/assets/enemies/undead/spritesheets/5Archer', ENEMY_ANIMS),
-        Assets.load<Texture>('/assets/environment/tiles/tiles_brown_01.png'),
+        loadTiles('environment/tiles/tiles_brown_01.png'),
+        loadTown(),
         loadFrames('/assets/heroes/effects/projectiles/Arrows/Arrow'),
         loadFrames('/assets/heroes/effects/projectiles/AoE/SwordAoE'),
         Assets.load<Texture>('/assets/ui/effects/Light.png'),
     ])
 
-    return { knight, warrior, archer, tiles, arrow, swordAoE, light }
+    return { knight, warrior, archer, tiles, town, arrow, swordAoE, light }
 }

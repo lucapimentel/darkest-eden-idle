@@ -1,6 +1,7 @@
 import { AnimatedSprite, Container, Sprite } from 'pixi.js'
 import { ENEMIES, heroStats, monsterLevel, type SaveState } from '@dei/game'
 import { bakeGround } from './ground.ts'
+import { placeTown } from './town.ts'
 import { FPS } from './sheet.ts'
 import { foesInRadius } from './combat.ts'
 import { createUnit, setState, updateUnit, type Stats, type Unit } from './units.ts'
@@ -11,6 +12,8 @@ export type Textures = Awaited<ReturnType<typeof loadTextures>>
 export interface World {
     root: Container
     update: (dtMs: number) => void
+    /** The ground is baked to the window, so a resized window needs a new one. */
+    resize: (width: number, height: number) => void
     /** The claim decides what dropped; the Performance only shows it. */
     queueDrops: (count: number) => void
     setSave: (save: SaveState) => void
@@ -26,6 +29,8 @@ const PILLAR_MS = 1200
 const PILLAR_W = 44
 const PILLAR_H = 260
 const PILLAR_RISE = 40 // px it drifts up over its life
+
+const GROUND_SEED = 7 // the ground decides nothing; one seed keeps it stable across rebakes
 
 const WALK_SPEED = 150 // px/s; how fast the sprite crosses the screen, nothing more
 const ENEMY_WALK_SPEED = 95
@@ -72,15 +77,18 @@ function enemyPerformanceStats(enemyId: string, level: number): Stats {
     }
 }
 
-export function createWorld(textures: Textures, initial: SaveState): World {
+export function createWorld(textures: Textures, initial: SaveState, width: number, height: number): World {
     const root = new Container()
-    root.addChild(bakeGround(textures.tiles, 14, 7)) // first child = drawn underneath
+    let ground = bakeGround(textures.tiles, width, height, GROUND_SEED)
+    root.addChild(ground) // first child = drawn underneath
     const units = new Container()
     units.sortableChildren = true // DEI-016: children are y-sorted by zIndex every frame
     root.addChild(units)
 
     let save = initial
     let level = monsterLevel(save.hero.stage)
+    // Props, not scenery: they y-sort with the units, so the Knight walks behind them.
+    let town = placeTown(units, textures.town, save.hero.stage)
     const knight = createUnit('hero', heroPerformanceStats(save), textures.knight, 0, 0)
     units.addChild(knight.view)
 
@@ -171,9 +179,19 @@ export function createWorld(textures: Textures, initial: SaveState): World {
         queueDrops(count) {
             pendingDrops += count
         },
+        resize(nextWidth, nextHeight) {
+            ground.destroy({ children: true })
+            ground = bakeGround(textures.tiles, nextWidth, nextHeight, GROUND_SEED)
+            root.addChildAt(ground, 0)
+        },
         setSave(next) {
+            const stage = save.hero.stage
             save = next
             level = monsterLevel(save.hero.stage)
+            if (save.hero.stage !== stage) {
+                for (const prop of town) prop.destroy()
+                town = placeTown(units, textures.town, save.hero.stage)
+            }
             // Stats can change mid-Performance (a level-up, an equip), exactly as in a claim.
             const restored = knight.hp / knight.stats.hp
             knight.stats = heroPerformanceStats(save)
