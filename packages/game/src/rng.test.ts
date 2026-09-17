@@ -5,7 +5,6 @@ import { mulberry32 } from './rng.ts';
 test("same seed gives the same sequence", () => {
     const a = mulberry32(42);
     const b = mulberry32(42);
-    console.log({ a: a(), b: b() })
     for (let i = 0; i < 1000; i++) {
         assert.equal(a(), b())
     }

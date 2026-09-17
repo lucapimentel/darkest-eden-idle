@@ -1,0 +1,60 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ClaimResult, SaveState } from '@dei/game'
+import { claim, load, write } from './save'
+
+const CLAIM_INTERVAL_MS = 30_000 // the cadence PLAN §2 specifies for the real thing
+const AWAY_REPORT_THRESHOLD_SEC = 60
+
+/**
+ * Server state, pretending to be a server. Everything that mutates the save settles a claim
+ * first, so rewards are always earned with the stats that earned them — a habit in M2, and a
+ * correctness requirement from M4 on.
+ */
+export function useGame() {
+    const [save, setSave] = useState<SaveState>(load)
+    const [away, setAway] = useState<ClaimResult | null>(null)
+    // Cumulative count of items claims have granted. The Arena shows one light pillar each,
+    // so the Performance never invents a drop of its own.
+    const [dropsGranted, setDropsGranted] = useState(0)
+    // The claim reads the latest save without re-arming the interval on every state change.
+    // Synced in an effect, not during render: `settle` only ever runs from a timer or an event,
+    // so it always sees a save the DOM has already committed.
+    const latest = useRef(save)
+    useEffect(() => { latest.current = save }, [save])
+
+    const settle = useCallback((): SaveState => {
+        const { save: next, result } = claim(latest.current)
+        latest.current = next
+        setSave(next)
+        if (result.items.length > 0) setDropsGranted((total) => total + result.items.length)
+        return next
+    }, [])
+
+    /** Apply a change on top of a freshly settled claim. */
+    const mutate = useCallback((change: (save: SaveState) => void) => {
+        const next = structuredClone(settle())
+        change(next)
+        write(next)
+        latest.current = next
+        setSave(next)
+    }, [settle])
+
+    useEffect(() => {
+        // The claim on load is the one that pays out time spent away.
+        const { save: next, result } = claim(latest.current)
+        latest.current = next
+        setSave(next)
+        setDropsGranted((total) => total + result.items.length)
+        if (result.elapsedSec >= AWAY_REPORT_THRESHOLD_SEC) setAway(result)
+
+        const id = setInterval(settle, CLAIM_INTERVAL_MS)
+        const onVisible = () => { if (document.visibilityState === 'visible') settle() }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => {
+            clearInterval(id)
+            document.removeEventListener('visibilitychange', onVisible)
+        }
+    }, [settle])
+
+    return { save, mutate, settle, away, dropsGranted, dismissAway: () => setAway(null) }
+}
