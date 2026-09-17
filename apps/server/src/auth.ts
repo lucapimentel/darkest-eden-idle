@@ -14,7 +14,7 @@ declare module 'fastify' {
 
 const isProd = process.env.NODE_ENV === 'production'
 
-const COOKIE = {
+const SESSION_COOKIE_OPTIONS = {
     httpOnly: true, // JavaScript cannot read it, so an XSS bug cannot steal it
     sameSite: 'lax', // not sent on cross-site POSTs: CSRF protection for free
     // HTTPS only in production. Locally there is no HTTPS, and a browser drops a `secure` cookie
@@ -31,7 +31,7 @@ const COOKIE = {
 const AUTH_RATE_LIMIT = { rateLimit: { max: 10, timeWindow: '15 minutes' } }
 
 // Fastify's own JSON-schema validation (PLAN §4), so no validation library.
-const credentials = {
+const credentialsSchema = {
     body: {
         type: 'object',
         required: ['email', 'password'],
@@ -58,29 +58,31 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-    async function startSession(reply: FastifyReply, userId: string) {
-        reply.setCookie(SESSION_COOKIE, await createSession(userId), COOKIE)
+    async function issueSessionCookie(reply: FastifyReply, userId: string) {
+        reply.setCookie(SESSION_COOKIE, await createSession(userId), SESSION_COOKIE_OPTIONS)
     }
 
-    app.post('/api/auth/signup', { schema: credentials, config: AUTH_RATE_LIMIT }, async (request, reply) => {
+    const authRoute = { schema: credentialsSchema, config: AUTH_RATE_LIMIT }
+
+    app.post('/api/auth/signup', authRoute, async (request, reply) => {
         const { email, password } = request.body as Credentials
-        const normalised = email.trim().toLowerCase()
-        const passwordHash = await hashPassword(password)
+        const normalisedEmail = email.trim().toLowerCase()
+        const hashedPassword = await hashPassword(password)
         try {
             // No select-then-insert: two simultaneous signups would both pass the check. The
             // unique constraint is the arbiter, and 23505 is Postgres' unique_violation.
             const [user] = await sql<{ id: string }[]>`
-                insert into users (email, password_hash) values (${normalised}, ${passwordHash})
+                insert into users (email, password_hash) values (${normalisedEmail}, ${hashedPassword})
                 returning id`
-            await startSession(reply, user.id)
-            return { id: user.id, email: normalised }
-        } catch (error) {
-            if ((error as { code?: string }).code !== '23505') throw error
+            await issueSessionCookie(reply, user.id)
+            return { id: user.id, email: normalisedEmail }
+        } catch (failure) {
+            if ((failure as { code?: string }).code !== '23505') throw failure
             return reply.code(409).send({ message: 'That email already has an account.' })
         }
     })
 
-    app.post('/api/auth/login', { schema: credentials, config: AUTH_RATE_LIMIT }, async (request, reply) => {
+    app.post('/api/auth/login', authRoute, async (request, reply) => {
         const { email, password } = request.body as Credentials
         // Columns by name, never `select *`: a password hash cannot leak out of an endpoint that
         // never selects it.
@@ -90,7 +92,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         if (!user || !await verifyPassword(password, user.password_hash)) {
             return reply.code(401).send({ message: 'Wrong email or password.' })
         }
-        await startSession(reply, user.id)
+        await issueSessionCookie(reply, user.id)
         return { id: user.id, email: user.email }
     })
 

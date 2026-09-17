@@ -1,10 +1,12 @@
-export function mulberry32(seed: number): () => number {
-    let parsedSeed = seed >>> 0; // parsed to unsigned 32 bit
+export function mulberry32(initialSeed: number): () => number {
+    let currentSeedState = initialSeed >>> 0; // parsed to unsigned 32 bit
     return () => {
-        parsedSeed = (parsedSeed + 0x6d2b79f5) >>> 0
-        let temporaryParsedSeed = parsedSeed;
-        temporaryParsedSeed = Math.imul(temporaryParsedSeed ^ (temporaryParsedSeed >>> 15), temporaryParsedSeed | 1);
-        temporaryParsedSeed ^= temporaryParsedSeed + Math.imul(temporaryParsedSeed ^ (temporaryParsedSeed >>> 7), temporaryParsedSeed | 61);
-        return ((temporaryParsedSeed ^ (temporaryParsedSeed >>> 14)) >>> 0) / 4294967296
+        currentSeedState = (currentSeedState + 0x6d2b79f5) >>> 0
+        let scrambledSeedState = currentSeedState;
+        scrambledSeedState = Math.imul(
+            scrambledSeedState ^ (scrambledSeedState >>> 15), scrambledSeedState | 1);
+        scrambledSeedState ^= scrambledSeedState + Math.imul(
+            scrambledSeedState ^ (scrambledSeedState >>> 7), scrambledSeedState | 61);
+        return ((scrambledSeedState ^ (scrambledSeedState >>> 14)) >>> 0) / 4294967296
     }
 }

@@ -18,17 +18,17 @@ export function armourReduction(armour: number, damage: number): number {
  */
 export function chanceToBeHit(evasion: number, monsterLevel: number): number {
     if (evasion <= 0) return 1
-    const accuracy = 40 + monsterLevel * 12
-    const chance = accuracy / (accuracy + Math.pow(evasion / 4, 0.8))
-    return Math.max(1 - EVASION_CAP, chance)
+    const monsterAccuracy = 40 + monsterLevel * 12
+    const chanceBeforeTheCap = monsterAccuracy / (monsterAccuracy + Math.pow(evasion / 4, 0.8))
+    return Math.max(1 - EVASION_CAP, chanceBeforeTheCap)
 }
 
-function resistance(stats: HeroStats, type: DamageType): number {
+function resistanceAgainstType(defenderStats: HeroStats, type: DamageType): number {
     switch (type) {
-        case 'fire': return stats.fireRes
-        case 'cold': return stats.coldRes
-        case 'lightning': return stats.lightningRes
-        case 'magical': return stats.magicalRes
+        case 'fire': return defenderStats.fireRes
+        case 'cold': return defenderStats.coldRes
+        case 'lightning': return defenderStats.lightningRes
+        case 'magical': return defenderStats.magicalRes
         case 'physical': return 0
     }
 }
@@ -40,15 +40,17 @@ function resistance(stats: HeroStats, type: DamageType): number {
  * rolling. A claim covers thousands of fights, so the expectation is what the player actually
  * experiences, and it keeps a claim low-variance and reproducible.
  */
-export function mitigate(damage: number, stats: HeroStats, type: DamageType, isAttack: boolean,
-    monsterLevel: number): number {
+export function mitigate(damage: number, defenderStats: HeroStats, type: DamageType,
+    isAttackRatherThanSpell: boolean, monsterLevel: number): number {
     if (damage <= 0) return 0
-    const blocked = Math.min(BLOCK_CAP, stats.blockChance / 100)
+    const blockedFraction = Math.min(BLOCK_CAP, defenderStats.blockChance / 100)
     // Spells can't be evaded (PLAN §3); attacks and arrows can.
-    const hitChance = isAttack ? chanceToBeHit(stats.evasion, monsterLevel) : 1
+    const chanceTheAttackLands = isAttackRatherThanSpell
+        ? chanceToBeHit(defenderStats.evasion, monsterLevel)
+        : 1
 
-    let taken = damage
-    if (type === 'physical') taken *= 1 - armourReduction(stats.armour, damage)
-    taken *= 1 - Math.min(RES_CAP, resistance(stats, type)) / 100
-    return taken * (1 - blocked) * hitChance
+    let damageAfterMitigation = damage
+    if (type === 'physical') damageAfterMitigation *= 1 - armourReduction(defenderStats.armour, damage)
+    damageAfterMitigation *= 1 - Math.min(RES_CAP, resistanceAgainstType(defenderStats, type)) / 100
+    return damageAfterMitigation * (1 - blockedFraction) * chanceTheAttackLands
 }

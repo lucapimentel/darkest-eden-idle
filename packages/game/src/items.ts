@@ -2,87 +2,90 @@ import { BASES, baseById, type Base } from './data/bases.ts'
 import { candidateMods, type ModDef, type ModTier } from './data/mods.ts'
 import type { Item, Mod, Rarity } from './types.ts'
 
-type Rand = () => number
+type RandomNumberSource = () => number
 
 export const MAX_DURABILITY = 100
 
 /** Max prefixes and suffixes per rarity (PLAN §3). Normal has no mods. */
 const AFFIX_LIMIT: Record<Rarity, number> = { normal: 0, magic: 1, rare: 3 }
 
-function pickWeighted<T>(rand: Rand, items: readonly T[], weight: (item: T) => number): T {
-    const total = items.reduce((sum, item) => sum + weight(item), 0)
-    let roll = rand() * total
-    for (const item of items) {
-        roll -= weight(item)
-        if (roll < 0) return item
+function pickByWeight<T>(nextRandom: RandomNumberSource, candidates: readonly T[],
+    weightOf: (candidate: T) => number): T {
+    const totalWeight = candidates
+        .reduce((runningWeight, candidate) => runningWeight + weightOf(candidate), 0)
+    let rollAcrossTheWeights = nextRandom() * totalWeight
+    for (const candidate of candidates) {
+        rollAcrossTheWeights -= weightOf(candidate)
+        if (rollAcrossTheWeights < 0) return candidate
     }
-    return items[items.length - 1]
+    return candidates[candidates.length - 1]
 }
 
 /** Luck shifts the rarity weights toward Magic and Rare. */
-export function rollRarity(rand: Rand, luck: number): Rarity {
-    const bonus = 1 + luck / 100
-    const weights: [Rarity, number][] = [
+export function rollRarity(nextRandom: RandomNumberSource, luck: number): Rarity {
+    const luckBonus = 1 + luck / 100
+    const rarityWeights: [Rarity, number][] = [
         ['normal', 70],
-        ['magic', 25 * bonus],
-        ['rare', 5 * bonus],
+        ['magic', 25 * luckBonus],
+        ['rare', 5 * luckBonus],
     ]
-    return pickWeighted(rand, weights, ([, weight]) => weight)[0]
+    return pickByWeight(nextRandom, rarityWeights, ([, weightOf]) => weightOf)[0]
 }
 
 /**
  * Luck also gives a chance to roll a value twice and keep the better one — on drops *and*
  * on crafts, which is why M6's `craft()` calls this same helper.
  */
-export function rollValue(rand: Rand, tier: ModTier, luck: number): number {
-    const [low, high] = tier.range
-    const once = () => low + rand() * (high - low)
-    const value = luck > 0 && rand() < Math.min(0.5, luck / 200)
-        ? Math.max(once(), once())
-        : once()
+export function rollValue(nextRandom: RandomNumberSource, tier: ModTier, luck: number): number {
+    const [lowestValue, highestValue] = tier.range
+    const rollOnce = () => lowestValue + nextRandom() * (highestValue - lowestValue)
+    const rolledValue = luck > 0 && nextRandom() < Math.min(0.5, luck / 200)
+        ? Math.max(rollOnce(), rollOnce())
+        : rollOnce()
     // One decimal is enough for every Tier range in the table, and it keeps saves small.
-    return Math.round(value * 10) / 10
+    return Math.round(rolledValue * 10) / 10
 }
 
-function rollMod(rand: Rand, pool: ModDef[], itemLevel: number, luck: number): Mod {
-    const def = pickWeighted(rand, pool, () => 1)
-    const allowed = def.tiers.filter((tier) => tier.itemLevel <= itemLevel)
-    const tier = pickWeighted(rand, allowed, (candidate) => candidate.weight)
-    return { modId: def.modId, tier: tier.tier, value: rollValue(rand, tier, luck) }
+function rollMod(nextRandom: RandomNumberSource, modPool: ModDef[], itemLevel: number, luck: number): Mod {
+    const modDefinition = pickByWeight(nextRandom, modPool, () => 1)
+    const tiersAllowedByItemLevel = modDefinition.tiers.filter((tier) => tier.itemLevel <= itemLevel)
+    const tier = pickByWeight(nextRandom, tiersAllowedByItemLevel, (tierCandidate) => tierCandidate.weight)
+    return { modId: modDefinition.modId, tier: tier.tier, value: rollValue(nextRandom, tier, luck) }
 }
 
-function rollAffixes(rand: Rand, base: Base, itemLevel: number, rarity: Rarity, luck: number): Mod[] {
-    const limit = AFFIX_LIMIT[rarity]
-    if (limit === 0) return []
-    const mods: Mod[] = []
+function rollAffixes(nextRandom: RandomNumberSource, chosenBase: Base, itemLevel: number,
+    rarity: Rarity, luck: number): Mod[] {
+    const maxModsPerAffixType = AFFIX_LIMIT[rarity]
+    if (maxModsPerAffixType === 0) return []
+    const rolledMods: Mod[] = []
     for (const type of ['prefix', 'suffix'] as const) {
         // At least one of each, then fill up to the limit.
-        const count = 1 + Math.floor(rand() * limit)
-        const pool = candidateMods(base.kind, itemLevel, type)
-        for (let i = 0; i < count && pool.length > 0; i++) {
-            const mod = rollMod(rand, pool, itemLevel, luck)
-            mods.push(mod)
+        const howManyToRoll = 1 + Math.floor(nextRandom() * maxModsPerAffixType)
+        const modPool = candidateMods(chosenBase.kind, itemLevel, type)
+        for (let i = 0; i < howManyToRoll && modPool.length > 0; i++) {
+            const rolledMod = rollMod(nextRandom, modPool, itemLevel, luck)
+            rolledMods.push(rolledMod)
             // No duplicate mods on one item: "+4 life, +7 life" is a bug, not an item.
-            pool.splice(pool.findIndex((def) => def.modId === mod.modId), 1)
+            modPool.splice(modPool.findIndex((modDefinition) => modDefinition.modId === rolledMod.modId), 1)
         }
     }
-    return mods
+    return rolledMods
 }
 
 /**
  * The generator is passed in, not a seed, so one claim's whole loot stream comes from one
  * sequence — which is what makes a claim replayable.
  */
-export function rollItem(rand: Rand, itemLevel: number, luck: number, id: string): Item {
-    const eligible = BASES.filter((base) => base.minItemLevel <= itemLevel)
-    const base = pickWeighted(rand, eligible, () => 1)
-    const rarity = rollRarity(rand, luck)
+export function rollItem(nextRandom: RandomNumberSource, itemLevel: number, luck: number, id: string): Item {
+    const basesAllowedByItemLevel = BASES.filter((chosenBase) => chosenBase.minItemLevel <= itemLevel)
+    const chosenBase = pickByWeight(nextRandom, basesAllowedByItemLevel, () => 1)
+    const rarity = rollRarity(nextRandom, luck)
     return {
         id,
-        baseId: base.baseId,
+        baseId: chosenBase.baseId,
         rarity,
         itemLevel,
-        mods: rollAffixes(rand, base, itemLevel, rarity, luck),
+        mods: rollAffixes(nextRandom, chosenBase, itemLevel, rarity, luck),
         durability: MAX_DURABILITY,
         maxDurability: MAX_DURABILITY,
         isNew: true,
@@ -102,14 +105,18 @@ export const WEAR_PER_KILL = 0.05 // ~2000 kills wears an item out if it is neve
  * Wear an equipped item for a Wave, then repair what the available gold covers.
  * When gold runs out the item keeps wearing, and at 0 it is Broken and gives no stats.
  */
-export function wearAndRepair(item: Item, kills: number, gold: number): { durability: number; spent: number } {
-    const worn = Math.max(0, item.durability - WEAR_PER_KILL * kills)
-    const missing = item.maxDurability - worn
-    if (missing <= 0 || gold <= 0) return { durability: worn, spent: 0 }
+export function wearAndRepair(item: Item, kills: number, gold: number):
+    { durability: number; spent: number } {
+    const durabilityAfterWear = Math.max(0, item.durability - WEAR_PER_KILL * kills)
+    const durabilityMissing = item.maxDurability - durabilityAfterWear
+    if (durabilityMissing <= 0 || gold <= 0) return { durability: durabilityAfterWear, spent: 0 }
 
-    const perPoint = repairCost(item)
-    const affordable = Math.min(missing, gold / perPoint)
-    return { durability: worn + affordable, spent: affordable * perPoint }
+    const goldPerDurabilityPoint = repairCost(item)
+    const durabilityTheGoldCovers = Math.min(durabilityMissing, gold / goldPerDurabilityPoint)
+    return {
+        durability: durabilityAfterWear + durabilityTheGoldCovers,
+        spent: durabilityTheGoldCovers * goldPerDurabilityPoint,
+    }
 }
 
 /** What the vendor pays. The Master Tree raises this in M8. */

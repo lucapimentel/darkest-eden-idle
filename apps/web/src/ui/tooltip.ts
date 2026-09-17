@@ -24,12 +24,12 @@ interface Rect {
  * clipped by that), which means it is placed in viewport coordinates and has to be kept inside
  * the viewport by hand: a slot near the left edge would otherwise centre its tooltip off-screen.
  */
-export function tooltipAnchor(rect: Rect, viewportWidth: number, viewportHeight: number): Anchor {
-    const centred = rect.left + rect.width / 2 - TOOLTIP_W / 2
-    const rightmost = Math.max(EDGE, viewportWidth - TOOLTIP_W - EDGE)
-    const left = Math.min(Math.max(EDGE, centred), rightmost)
+export function tooltipAnchor(slotRect: Rect, viewportWidth: number, viewportHeight: number): Anchor {
+    const centredLeft = slotRect.left + slotRect.width / 2 - TOOLTIP_W / 2
+    const rightmostAllowedLeft = Math.max(EDGE, viewportWidth - TOOLTIP_W - EDGE)
+    const left = Math.min(Math.max(EDGE, centredLeft), rightmostAllowedLeft)
 
     // Flip above the slot only when the slot is in the lower half, where there is no room below.
-    const above = rect.top > viewportHeight / 2
-    return { left, top: above ? rect.top - GAP : rect.bottom + GAP, above }
+    const above = slotRect.top > viewportHeight / 2
+    return { left, top: above ? slotRect.top - GAP : slotRect.bottom + GAP, above }
 }

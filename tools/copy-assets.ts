@@ -47,7 +47,7 @@ const ALLOW = [
 ]
 
 /** PNG header: width and height are big-endian uint32s at byte 16 and 20 (IHDR). */
-function pngHeight(file: string): number {
+function readPngHeight(file: string): number {
     return readFileSync(file).readUInt32BE(20)
 }
 
@@ -58,25 +58,25 @@ function pngHeight(file: string): number {
  *
  * The trap: Unity rects are bottom-up. Convert to Pixi's top-down here, once.
  */
-function tileCells(file: string) {
-    const meta = readFileSync(join(SRC, `${file}.meta`), 'utf8')
-    const height = pngHeight(join(SRC, file))
-    const rects = [...meta.matchAll(/x: (\d+)\s+y: (\d+)\s+width: (\d+)\s+height: (\d+)/g)]
-        .map(([, x, y, w, h]) => ({ x: +x, y: height - +y - +h, w: +w, h: +h }))
-    rects.sort((a, b) => a.y - b.y || a.x - b.x)
-    return rects
+function tileCellRects(file: string) {
+    const metaFileText = readFileSync(join(SRC, `${file}.meta`), 'utf8')
+    const sheetHeight = readPngHeight(join(SRC, file))
+    const cellRects = [...meta.matchAll(/x: (\d+)\s+y: (\d+)\s+width: (\d+)\s+sheetHeight: (\d+)/g)]
+        .map(([, x, y, w, h]) => ({ x: +x, y: sheetHeight - +y - +h, w: +w, h: +h }))
+    cellRects.sort((a, b) => a.y - b.y || a.x - b.x)
+    return cellRects
 }
 
 // Start clean, so files removed from ALLOW disappear from public/ too
 rmSync(DEST, { recursive: true, force: true })
 
 for (const file of ALLOW) {
-    const to = join(DEST, file);
-    mkdirSync(dirname(to), { recursive: true });
-    copyFileSync(join(SRC, file), to)
+    const destinationPath = join(DEST, file);
+    mkdirSync(dirname(destinationPath), { recursive: true });
+    copyFileSync(join(SRC, file), destinationPath)
     console.log('copied', file);
 }
 
-const tiles = Object.fromEntries(TILE_SHEETS.map((file) => [file, tileCells(file)]))
+const tiles = Object.fromEntries(TILE_SHEETS.map((file) => [file, tileCellRects(file)]))
 writeFileSync(join(DEST, 'environment/tiles/tiles.json'), JSON.stringify(tiles))
 console.log('wrote tiles.json', Object.entries(tiles).map(([k, v]) => `${k}: ${v.length} cells`).join(', '))

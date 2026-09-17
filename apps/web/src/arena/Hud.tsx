@@ -14,33 +14,41 @@ export function Hud({ save, fpsRef, email, onOpenInventory, onLogout }: {
 }) {
     const [shownFps, setShownFps] = useState(0)
     useEffect(() => {
-        const id = setInterval(() => setShownFps(fpsRef.current), 250)
-        return () => clearInterval(id)
+        const pollIntervalId = setInterval(() => setShownFps(fpsRef.current), 250)
+        return () => clearInterval(pollIntervalId)
     }, [fpsRef])
 
     const stats = heroStats(save.hero)
     const level = levelFromXp(save.hero.xp)
-    const into = save.hero.xp - xpForLevel(level)
-    const next = xpToNext(level)
+    const xpIntoThisLevel = save.hero.xp - xpForLevel(level)
+    const xpNeededForNextLevel = xpToNext(level)
     const newItems = [...save.hero.inventory, ...save.hero.overflow]
         .filter((item) => item?.isNew).length
     const overflowUsed = save.hero.overflow.filter(Boolean).length
-    const full = save.hero.inventory.every(Boolean)
+    const inventoryIsFull = save.hero.inventory.every(Boolean)
 
     return (
         <aside className="hud">
             <h1>Darkest Eden Idle</h1>
-            <p>Knight · level {level} <small>({into.toLocaleString()} / {next.toLocaleString()} xp)</small></p>
-            <p className="bar"><span style={{ width: `${(into / next) * 100}%` }} /></p>
+            <p>
+                Knight · level {level}{' '}
+                <small>
+                    ({xpIntoThisLevel.toLocaleString()} / {xpNeededForNextLevel.toLocaleString()} xp)
+                </small>
+            </p>
+            <p className="bar">
+                <span style={{ width: `${(xpIntoThisLevel / xpNeededForNextLevel) * 100}%` }} />
+            </p>
             <p>Stage {save.hero.stage} · Wave {save.hero.wave}</p>
             <p>{save.gold.toLocaleString()} gold · {stats.maxLife} life</p>
 
             <button type="button" onClick={onOpenInventory}>
                 Inventory{newItems > 0 && <span className="badge">{newItems}</span>}
             </button>
-            {full && (
+            {inventoryIsFull && (
                 <p className="warn">
-                    Inventory full — drops are going to the Overflow ({overflowUsed}/{save.hero.overflow.length}).
+                    Inventory full — drops are going to the Overflow
+                    ({overflowUsed}/{save.hero.overflow.length}).
                 </p>
             )}
             <p><small>{Math.round(shownFps)} fps</small></p>

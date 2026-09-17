@@ -11,11 +11,11 @@ export type Textures = Awaited<ReturnType<typeof loadTextures>>
 
 export interface World {
     root: Container
-    update: (dtMs: number) => void
+    update: (msSinceLastFrame: number) => void
     /** The ground is baked to the window, so a resized window needs a new one. */
     resize: (width: number, height: number) => void
     /** The claim decides what dropped; the Performance only shows it. */
-    queueDrops: (count: number) => void
+    queueDrops: (itemCount: number) => void
     setSave: (save: SaveState) => void
 }
 
@@ -54,7 +54,7 @@ function heroPerformanceStats(save: SaveState): Stats {
         damage: stats.hitDamage,
         attackMs: 1000 / stats.attacksPerSecond,
         hitFrame: 8,
-        cleave: {
+        cleaveStats: {
             damage: stats.cleaveDamage,
             radius: CLEAVE_RADIUS,
             cooldownMs: stats.cleaveCooldownSec * 1000,
@@ -64,16 +64,16 @@ function heroPerformanceStats(save: SaveState): Stats {
     }
 }
 
-function enemyPerformanceStats(enemyId: string, level: number): Stats {
-    const def = ENEMIES.find((enemy) => enemy.enemyId === enemyId) ?? ENEMIES[0]
+function enemyPerformanceStats(enemyId: string, monsterLevelForStage: number): Stats {
+    const enemyDefinition = ENEMIES.find((enemy) => enemy.enemyId === enemyId) ?? ENEMIES[0]
     return {
-        hp: Math.round(def.life * (1 + 0.35 * (level - 1))),
+        hp: Math.round(enemyDefinition.life * (1 + 0.35 * (monsterLevelForStage - 1))),
         speed: ENEMY_WALK_SPEED,
-        range: def.ranged ? RANGED_RANGE : MELEE_RANGE,
-        damage: def.damage * (1 + 0.3 * (level - 1)),
-        attackMs: def.attackMs,
-        hitFrame: def.ranged ? 9 : 7,
-        ranged: def.ranged,
+        range: enemyDefinition.ranged ? RANGED_RANGE : MELEE_RANGE,
+        damage: enemyDefinition.damage * (1 + 0.3 * (monsterLevelForStage - 1)),
+        attackMs: enemyDefinition.attackMs,
+        hitFrame: enemyDefinition.ranged ? 9 : 7,
+        ranged: enemyDefinition.ranged,
     }
 }
 
@@ -86,7 +86,7 @@ export function createWorld(textures: Textures, initial: SaveState, width: numbe
     root.addChild(units)
 
     let save = initial
-    let level = monsterLevel(save.hero.stage)
+    let monsterLevelForStage = monsterLevel(save.hero.stage)
     // Props, not scenery: they y-sort with the units, so the Knight walks behind them.
     let town = placeTown(units, textures.town, save.hero.stage)
     const knight = createUnit('hero', heroPerformanceStats(save), textures.knight, 0, 0)
@@ -101,14 +101,14 @@ export function createWorld(textures: Textures, initial: SaveState, width: numbe
     let pendingDrops = 0 // granted by a claim, spent on the next visual kills
 
     function spawnWave() {
-        const size = 1 + Math.floor(Math.random() * 4)
-        for (let i = 0; i < size; i++) {
+        const packSize = 1 + Math.floor(Math.random() * 4)
+        for (let i = 0; i < packSize; i++) {
             const angle = Math.random() * Math.PI * 2
-            const archer = Math.random() < 0.4
+            const isArcher = Math.random() < 0.4
             const enemy = createUnit(
                 'enemy',
-                enemyPerformanceStats(archer ? 'archer' : 'warrior', level),
-                archer ? textures.archer : textures.warrior,
+                enemyPerformanceStats(isArcher ? 'archer' : 'warrior', monsterLevelForStage),
+                isArcher ? textures.archer : textures.warrior,
                 Math.cos(angle) * 460, Math.sin(angle) * 230,
             )
             enemies.push(enemy)
@@ -147,18 +147,18 @@ export function createWorld(textures: Textures, initial: SaveState, width: numbe
     }
 
     function onHit(attacker: Unit, target: Unit) {
-        const cleave = attacker.stats.cleave
+        const cleave = attacker.stats.cleaveStats
         if (attacker.state === 'cleave' && cleave) {
-            const swing = new AnimatedSprite({
+            const swingSprite = new AnimatedSprite({
                 textures: textures.swordAoE, animationSpeed: FPS / 60, loop: false,
             })
-            swing.anchor.set(0.5)
-            swing.setSize(cleave.radius * 2, cleave.radius) // squashed, so it lies on the iso floor
-            swing.position.set(attacker.x, attacker.y)
-            swing.zIndex = attacker.y - 1 // under the swinging Knight
-            swing.onComplete = () => swing.destroy()
-            swing.play()
-            units.addChild(swing)
+            swingSprite.anchor.set(0.5)
+            swingSprite.setSize(cleave.radius * 2, cleave.radius) // squashed, so it lies on the iso floor
+            swingSprite.position.set(attacker.x, attacker.y)
+            swingSprite.zIndex = attacker.y - 1 // under the swinging Knight
+            swingSprite.onComplete = () => swingSprite.destroy()
+            swingSprite.play()
+            units.addChild(swingSprite)
             for (const foe of foesInRadius(attacker.x, attacker.y, enemies, cleave.radius)) {
                 damage(foe, cleave.damage)
             }
@@ -176,52 +176,52 @@ export function createWorld(textures: Textures, initial: SaveState, width: numbe
 
     return {
         root,
-        queueDrops(count) {
-            pendingDrops += count
+        queueDrops(itemCount) {
+            pendingDrops += itemCount
         },
-        resize(nextWidth, nextHeight) {
+        resize(newScreenWidth, newScreenHeight) {
             ground.destroy({ children: true })
-            ground = bakeGround(textures.tiles, nextWidth, nextHeight, GROUND_SEED)
+            ground = bakeGround(textures.tiles, newScreenWidth, newScreenHeight, GROUND_SEED)
             root.addChildAt(ground, 0)
         },
-        setSave(next) {
+        setSave(nextSave) {
             const stage = save.hero.stage
-            save = next
-            level = monsterLevel(save.hero.stage)
+            save = nextSave
+            monsterLevelForStage = monsterLevel(save.hero.stage)
             if (save.hero.stage !== stage) {
                 for (const prop of town) prop.destroy()
                 town = placeTown(units, textures.town, save.hero.stage)
             }
             // Stats can change mid-Performance (a level-up, an equip), exactly as in a claim.
-            const restored = knight.hp / knight.stats.hp
+            const lifeFractionBeforeTheChange = knight.hp / knight.stats.hp
             knight.stats = heroPerformanceStats(save)
-            knight.hp = knight.stats.hp * restored
+            knight.hp = knight.stats.hp * lifeFractionBeforeTheChange
         },
-        update(dtMs) {
-            updateUnit(knight, dtMs, enemies, onHit)
-            for (const enemy of enemies) updateUnit(enemy, dtMs, [knight], onHit)
+        update(msSinceLastFrame) {
+            updateUnit(knight, msSinceLastFrame, enemies, onHit)
+            for (const enemy of enemies) updateUnit(enemy, msSinceLastFrame, [knight], onHit)
 
             for (let i = arrows.length - 1; i >= 0; i--) {
                 const arrow = arrows[i]
-                const dx = arrow.target.x - arrow.sprite.x
-                const dy = arrow.target.y - CHEST - arrow.sprite.y
-                const dist = Math.hypot(dx, dy)
-                const step = (ARROW_SPEED * dtMs) / 1000
-                if (dist <= step || arrow.target.state === 'dead') {
+                const deltaX = arrow.target.x - arrow.sprite.x
+                const deltaY = arrow.target.y - CHEST - arrow.sprite.y
+                const distanceToTarget = Math.hypot(deltaX, deltaY)
+                const step = (ARROW_SPEED * msSinceLastFrame) / 1000
+                if (distanceToTarget <= step || arrow.target.state === 'dead') {
                     damage(arrow.target, arrow.damage)
                     arrow.sprite.destroy()
                     arrows.splice(i, 1)
                     continue
                 }
-                arrow.sprite.x += (dx / dist) * step
-                arrow.sprite.y += (dy / dist) * step
-                arrow.sprite.rotation = Math.atan2(dy, dx)
+                arrow.sprite.x += (deltaX / distanceToTarget) * step
+                arrow.sprite.y += (deltaY / distanceToTarget) * step
+                arrow.sprite.rotation = Math.atan2(deltaY, deltaX)
                 arrow.sprite.zIndex = arrow.sprite.y
             }
 
             for (let i = pillars.length - 1; i >= 0; i--) {
                 const pillar = pillars[i]
-                pillar.ms += dtMs
+                pillar.ms += msSinceLastFrame
                 const life = pillar.ms / PILLAR_MS
                 if (life >= 1) {
                     pillar.sprite.destroy()
@@ -229,11 +229,11 @@ export function createWorld(textures: Textures, initial: SaveState, width: numbe
                     continue
                 }
                 pillar.sprite.alpha = 1 - life
-                pillar.sprite.y -= (PILLAR_RISE * dtMs) / PILLAR_MS
+                pillar.sprite.y -= (PILLAR_RISE * msSinceLastFrame) / PILLAR_MS
             }
 
             if (knight.state === 'dead') {
-                knightDeadMs += dtMs
+                knightDeadMs += msSinceLastFrame
                 if (knightDeadMs >= RESPAWN_MS) {
                     for (const enemy of enemies) enemy.view.destroy({ children: true })
                     enemies = []
@@ -255,7 +255,7 @@ export function createWorld(textures: Textures, initial: SaveState, width: numbe
                 nextWaveMs = NEXT_WAVE_MS
             }
             if (waitingForWave) {
-                nextWaveMs -= dtMs
+                nextWaveMs -= msSinceLastFrame
                 if (nextWaveMs <= 0) spawnWave()
             }
 

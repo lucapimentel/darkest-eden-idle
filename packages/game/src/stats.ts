@@ -31,32 +31,32 @@ export interface HeroStats {
 export const isBroken = (item: Item) => item.durability <= 0
 
 export function itemStats(item: Item): StatBag {
-    const bag: StatBag = {}
-    if (isBroken(item)) return bag
+    const statsFromMods: StatBag = {}
+    if (isBroken(item)) return statsFromMods
     for (const mod of item.mods) {
         const stat = modById(mod.modId).stat
-        bag[stat] = (bag[stat] ?? 0) + mod.value
+        statsFromMods[stat] = (statsFromMods[stat] ?? 0) + mod.value
     }
-    return bag
+    return statsFromMods
 }
 
 function sumEquipped(hero: Hero): StatBag {
-    const total: StatBag = {}
+    const combinedStats: StatBag = {}
     for (const item of Object.values(hero.equipped)) {
         for (const [stat, value] of Object.entries(itemStats(item))) {
-            const key = stat as keyof StatBag
-            total[key] = (total[key] ?? 0) + value
+            const typedStatKey = stat as keyof StatBag
+            combinedStats[typedStatKey] = (combinedStats[typedStatKey] ?? 0) + value
         }
     }
-    return total
+    return combinedStats
 }
 
 /** Base weapon damage, ignoring mods. An empty main hand still swings, just badly. */
 function weaponDamage(hero: Hero): number {
-    const weapon = hero.equipped.mainhand
-    if (!weapon || isBroken(weapon)) return 3 // bare hands
-    const physical = baseById(weapon.baseId).physical
-    return physical ? (physical[0] + physical[1]) / 2 : 3
+    const mainHandWeapon = hero.equipped.mainhand
+    if (!mainHandWeapon || isBroken(mainHandWeapon)) return 3 // bare hands
+    const physicalDamageRange = baseById(mainHandWeapon.baseId).physical
+    return physicalDamageRange ? (physicalDamageRange[0] + physicalDamageRange[1]) / 2 : 3
 }
 
 /**
@@ -64,43 +64,44 @@ function weaponDamage(hero: Hero): number {
  * Order matters: base → flat → derived → increased.
  */
 export function heroStats(hero: Hero): HeroStats {
-    const def = CLASSES[hero.classId]
+    const classDefinition = CLASSES[hero.classId]
     const level = levelFromXp(hero.xp)
-    const bag = sumEquipped(hero)
+    const statsFromMods = sumEquipped(hero)
 
-    const all = bag.allAttributes ?? 0
-    const fromLevel = def.attributePerLevel * (level - 1)
-    const str = def.str + fromLevel + all + (bag.str ?? 0)
-    const dex = def.dex + fromLevel + all + (bag.dex ?? 0)
-    const int = def.int + fromLevel + all + (bag.int ?? 0)
+    const allAttributesBonus = statsFromMods.allAttributes ?? 0
+    const attributeGainFromLevels = classDefinition.attributePerLevel * (level - 1)
+    const str = classDefinition.str + attributeGainFromLevels + allAttributesBonus + (statsFromMods.str ?? 0)
+    const dex = classDefinition.dex + attributeGainFromLevels + allAttributesBonus + (statsFromMods.dex ?? 0)
+    const int = classDefinition.int + attributeGainFromLevels + allAttributesBonus + (statsFromMods.int ?? 0)
 
     // Attributes scale the defenses (CONTEXT: Str → life, Dex → evasion, Int → energy shield).
-    const maxLife = Math.round(def.baseLife + def.lifePerLevel * (level - 1) + str * 2 + (bag.life ?? 0))
-    const maxEnergyShield = Math.round(int * 1.5 + (bag.energyShield ?? 0))
-    const evasion = Math.round(dex * 2 + (bag.evasion ?? 0))
+    const maxLife = Math.round(classDefinition.baseLife
+        + classDefinition.lifePerLevel * (level - 1) + str * 2 + (statsFromMods.life ?? 0))
+    const maxEnergyShield = Math.round(int * 1.5 + (statsFromMods.energyShield ?? 0))
+    const evasion = Math.round(dex * 2 + (statsFromMods.evasion ?? 0))
 
-    const crit = Math.min(100, 5 + (bag.critChance ?? 0)) / 100
-    const critMultiplier = 1 + crit * (0.5 + (bag.critDamage ?? 0) / 100)
-    const fromLevelDamage = 1 + def.damagePerLevel * (level - 1)
-    const hit = (weaponDamage(hero) + (bag.addedPhysical ?? 0))
-        * (1 + (bag.increasedPhysical ?? 0) / 100) * fromLevelDamage
+    const critChanceFraction = Math.min(100, 5 + (statsFromMods.critChance ?? 0)) / 100
+    const critMultiplier = 1 + critChanceFraction * (0.5 + (statsFromMods.critDamage ?? 0) / 100)
+    const damageBonusFromLevels = 1 + classDefinition.damagePerLevel * (level - 1)
+    const basicHitDamage = (weaponDamage(hero) + (statsFromMods.addedPhysical ?? 0))
+        * (1 + (statsFromMods.increasedPhysical ?? 0) / 100) * damageBonusFromLevels
 
     return {
         level, str, dex, int,
         maxLife,
         maxEnergyShield,
-        maxMana: Math.round(def.baseMana + int + (bag.mana ?? 0)),
-        armour: Math.round(bag.armour ?? 0),
+        maxMana: Math.round(classDefinition.baseMana + int + (statsFromMods.mana ?? 0)),
+        armour: Math.round(statsFromMods.armour ?? 0),
         evasion,
-        blockChance: Math.min(50, bag.blockChance ?? 0), // cap 50%
-        fireRes: Math.min(75, bag.fireRes ?? 0),
-        coldRes: Math.min(75, bag.coldRes ?? 0),
-        lightningRes: Math.min(75, bag.lightningRes ?? 0),
-        magicalRes: Math.min(75, bag.magicalRes ?? 0),
-        luck: bag.luck ?? 0,
-        hitDamage: hit * critMultiplier,
-        attacksPerSecond: def.attacksPerSecond * (1 + (bag.attackSpeed ?? 0) / 100),
-        cleaveDamage: hit * critMultiplier * def.cleave.multiplier,
-        cleaveCooldownSec: def.cleave.cooldownSec,
+        blockChance: Math.min(50, statsFromMods.blockChance ?? 0), // cap 50%
+        fireRes: Math.min(75, statsFromMods.fireRes ?? 0),
+        coldRes: Math.min(75, statsFromMods.coldRes ?? 0),
+        lightningRes: Math.min(75, statsFromMods.lightningRes ?? 0),
+        magicalRes: Math.min(75, statsFromMods.magicalRes ?? 0),
+        luck: statsFromMods.luck ?? 0,
+        hitDamage: basicHitDamage * critMultiplier,
+        attacksPerSecond: classDefinition.attacksPerSecond * (1 + (statsFromMods.attackSpeed ?? 0) / 100),
+        cleaveDamage: basicHitDamage * critMultiplier * classDefinition.cleave.multiplier,
+        cleaveCooldownSec: classDefinition.cleave.cooldownSec,
     }
 }

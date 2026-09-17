@@ -1,7 +1,7 @@
 import type { ClaimResult } from '@dei/game'
 import { ItemSlot } from './Item'
 
-function duration(seconds: number): string {
+function describeDuration(seconds: number): string {
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.round((seconds % 3600) / 60)
     if (hours === 0) return `${minutes} minute${minutes === 1 ? '' : 's'}`
@@ -14,7 +14,7 @@ function duration(seconds: number): string {
  * quietly ate loot trusts nothing afterwards.
  */
 export function AwayReport({ result, onClose }: { result: ClaimResult; onClose: () => void }) {
-    const shown = result.items.slice(-12)
+    const itemsToShow = result.items.slice(-12)
     return (
         <div className="panel-backdrop" onClick={onClose}>
             <div className="panel report" onClick={(event) => event.stopPropagation()}>
@@ -22,7 +22,7 @@ export function AwayReport({ result, onClose }: { result: ClaimResult; onClose: 
                     <h2>While you were away</h2>
                     <button type="button" onClick={onClose}>close</button>
                 </header>
-                <p className="dim">{duration(result.elapsedSec)} on Stage {result.stage}.</p>
+                <p className="dim">{describeDuration(result.elapsedSec)} on Stage {result.stage}.</p>
 
                 <dl className="stats">
                     <div><dt>Kills</dt><dd>{result.kills.toLocaleString()}</dd></div>
@@ -52,7 +52,7 @@ export function AwayReport({ result, onClose }: { result: ClaimResult; onClose: 
                     </p>
                 )}
                 <div className="grid">
-                    {shown.map((item) => <ItemSlot key={item.id} item={item} />)}
+                    {itemsToShow.map((item) => <ItemSlot key={item.id} item={item} />)}
                 </div>
 
                 <button type="button" onClick={onClose}>continue</button>

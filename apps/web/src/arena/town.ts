@@ -19,19 +19,22 @@ const COUNT = 12
  * Seeded per Stage, so a Stage looks the same every visit and Stage 1 is not Stage 7. That is
  * stability, not fairness: nothing here is an outcome.
  */
-export function placeTown(parent: Container, props: Texture[], stage: number): Sprite[] {
-    const rand = mulberry32(hash('town', stage))
-    const placed: Sprite[] = []
-    for (let i = 0; i < COUNT; i++) {
-        const angle = ((i + rand() * 0.7) / COUNT) * Math.PI * 2
-        const spread = 1 + rand() * 0.45
-        const sprite = new Sprite(props[Math.floor(rand() * props.length)])
-        sprite.anchor.set(0.5, 1) // bottom-centre: the sprite's feet sit on the tile
-        sprite.scale.set(SCALE)
-        sprite.position.set(Math.cos(angle) * CLEAR_RX * spread, Math.sin(angle) * CLEAR_RY * spread)
-        sprite.zIndex = sprite.y
-        parent.addChild(sprite)
-        placed.push(sprite)
+export function placeTown(parentContainer: Container, propTextures: Texture[], stage: number): Sprite[] {
+    const nextRandom = mulberry32(hash('town', stage))
+    const placedProps: Sprite[] = []
+    for (let propIndex = 0; propIndex < COUNT; propIndex++) {
+        const angle = ((propIndex + nextRandom() * 0.7) / COUNT) * Math.PI * 2
+        const radiusMultiplier = 1 + nextRandom() * 0.45
+        const propSprite = new Sprite(propTextures[Math.floor(nextRandom() * propTextures.length)])
+        propSprite.anchor.set(0.5, 1) // bottom-centre: the sprite's feet sit on the tile
+        propSprite.scale.set(SCALE)
+        propSprite.position.set(
+            Math.cos(angle) * CLEAR_RX * radiusMultiplier,
+            Math.sin(angle) * CLEAR_RY * radiusMultiplier,
+        )
+        propSprite.zIndex = propSprite.y
+        parentContainer.addChild(propSprite)
+        placedProps.push(propSprite)
     }
-    return placed
+    return placedProps
 }

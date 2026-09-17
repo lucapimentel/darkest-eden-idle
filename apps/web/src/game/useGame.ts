@@ -19,40 +19,40 @@ export function useGame() {
     // The claim reads the latest save without re-arming the interval on every state change.
     // Synced in an effect, not during render: `settle` only ever runs from a timer or an event,
     // so it always sees a save the DOM has already committed.
-    const latest = useRef(save)
-    useEffect(() => { latest.current = save }, [save])
+    const latestSave = useRef(save)
+    useEffect(() => { latestSave.current = save }, [save])
 
     const settle = useCallback((): SaveState => {
-        const { save: next, result } = claim(latest.current)
-        latest.current = next
-        setSave(next)
-        if (result.items.length > 0) setDropsGranted((total) => total + result.items.length)
-        return next
+        const { save: nextSave, result } = claim(latestSave.current)
+        latestSave.current = nextSave
+        setSave(nextSave)
+        if (result.items.length > 0) setDropsGranted((previousTotal) => previousTotal + result.items.length)
+        return nextSave
     }, [])
 
     /** Apply a change on top of a freshly settled claim. */
-    const mutate = useCallback((change: (save: SaveState) => void) => {
-        const next = structuredClone(settle())
-        change(next)
-        write(next)
-        latest.current = next
-        setSave(next)
+    const mutate = useCallback((applyChange: (save: SaveState) => void) => {
+        const nextSave = structuredClone(settle())
+        applyChange(nextSave)
+        write(nextSave)
+        latestSave.current = nextSave
+        setSave(nextSave)
     }, [settle])
 
     useEffect(() => {
         // The claim on load is the one that pays out time spent away.
-        const { save: next, result } = claim(latest.current)
-        latest.current = next
-        setSave(next)
-        setDropsGranted((total) => total + result.items.length)
+        const { save: nextSave, result } = claim(latestSave.current)
+        latestSave.current = nextSave
+        setSave(nextSave)
+        setDropsGranted((previousTotal) => previousTotal + result.items.length)
         if (result.elapsedSec >= AWAY_REPORT_THRESHOLD_SEC) setAway(result)
 
-        const id = setInterval(settle, CLAIM_INTERVAL_MS)
-        const onVisible = () => { if (document.visibilityState === 'visible') settle() }
-        document.addEventListener('visibilitychange', onVisible)
+        const claimIntervalId = setInterval(settle, CLAIM_INTERVAL_MS)
+        const onTabBecameVisible = () => { if (document.visibilityState === 'visible') settle() }
+        document.addEventListener('visibilitychange', onTabBecameVisible)
         return () => {
-            clearInterval(id)
-            document.removeEventListener('visibilitychange', onVisible)
+            clearInterval(claimIntervalId)
+            document.removeEventListener('visibilitychange', onTabBecameVisible)
         }
     }, [settle])
 

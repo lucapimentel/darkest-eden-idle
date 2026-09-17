@@ -32,16 +32,16 @@ export function Scene({ save, drops, onFps }: {
         // The ground is baked to the window and cached as one texture, so a window that grows
         // would show bare corners until it is rebaked. Debounced: a drag-resize fires
         // continuously and re-caching is the expensive part.
-        let timer: ReturnType<typeof setTimeout>
+        let rebakeTimer: ReturnType<typeof setTimeout>
         const onResize = (width: number, height: number) => {
-            clearTimeout(timer)
-            timer = setTimeout(() => world.current?.resize(width, height), RESIZE_DEBOUNCE_MS)
+            clearTimeout(rebakeTimer)
+            rebakeTimer = setTimeout(() => world.current?.resize(width, height), RESIZE_DEBOUNCE_MS)
         }
         app.renderer.on('resize', onResize)
 
         return () => {
             cancelled = true
-            clearTimeout(timer)
+            clearTimeout(rebakeTimer)
             app.renderer.off('resize', onResize)
             world.current?.root.destroy({ children: true })
             world.current = null
@@ -54,12 +54,12 @@ export function Scene({ save, drops, onFps }: {
     }, [save])
 
     // `drops` is a running total, so queue only what has not been performed yet.
-    const queued = useRef(0)
+    const dropsAlreadyQueued = useRef(0)
     useEffect(() => {
-        const pending = drops - queued.current
-        if (pending <= 0) return
-        queued.current = drops
-        world.current?.queueDrops(pending)
+        const dropsNotYetPerformed = drops - dropsAlreadyQueued.current
+        if (dropsNotYetPerformed <= 0) return
+        dropsAlreadyQueued.current = drops
+        world.current?.queueDrops(dropsNotYetPerformed)
     }, [drops])
 
     useTick(

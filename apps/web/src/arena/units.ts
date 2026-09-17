@@ -22,13 +22,13 @@ export interface Stats {
     attackMs: number
     hitFrame: number
     ranged?: boolean // DEI-015: the hit frame fires an arrow instead of dealing damage
-    cleave?: Cleave // DEI-017: only the Knight has one in M1
+    cleaveStats?: Cleave // DEI-017: only the Knight has one in M1
 }
 
 export interface Unit {
     team: 'hero' | 'enemy'
     stats: Stats
-    anims: Record<State, Anim>
+    animationsByState: Record<State, Anim>
     x: number
     y: number
     hp: number
@@ -52,29 +52,29 @@ const BAR_H = 4
 const BAR_Y = -72 // px above the feet: just over the head (the sprite does not fill its 128px cell)
 
 // Texture.WHITE + tint + size is a 1px texture stretched, so a life bar costs no redraw.
-function makeBar(parent: Container, tint: number): Sprite {
+function makeLifeBar(parentContainer: Container, tint: number): Sprite {
     const bar = new Sprite(Texture.WHITE)
     bar.tint = tint
     bar.anchor.set(0, 0.5)
     bar.setSize(BAR_W, BAR_H)
     bar.position.set(-BAR_W / 2, BAR_Y)
-    parent.addChild(bar)
+    parentContainer.addChild(bar)
     return bar
 }
 
-export function createUnit(team: Unit['team'], stats: Stats, anims: Record<State, Anim>, x:
+export function createUnit(team: Unit['team'], stats: Stats, animationsByState: Record<State, Anim>, x:
     number, y: number): Unit {
-    const sprite = new Sprite(anims.idle[2][0])
+    const sprite = new Sprite(animationsByState.idle[2][0])
     sprite.anchor.set(0.5, 105 / 128)
     const view = new Container()
     view.addChild(sprite)
     const bars = new Container()
     view.addChild(bars)
-    makeBar(bars, 0x000000) // the empty track, drawn under the fill
-    const bar = makeBar(bars, team === 'hero' ? 0x4c9a4c : 0xa33a3a)
+    makeLifeBar(bars, 0x000000) // the empty track, drawn under the fill
+    const bar = makeLifeBar(bars, team === 'hero' ? 0x4c9a4c : 0xa33a3a)
     view.position.set(x, y)
     return {
-        team, stats, anims, x, y,
+        team, stats, animationsByState, x, y,
         hp: stats.hp,
         state: 'idle', row: 2, frame: 0, frameMs: 0, deadMs: 0,
         cooldownMs: 0, cleaveMs: 0,
@@ -82,86 +82,93 @@ export function createUnit(team: Unit['team'], stats: Stats, anims: Record<State
     }
 }
 
-export function setState(u: Unit, state: State) {
-    if (u.state === state) return
-    u.state = state
-    u.frame = 0
-    u.frameMs = 0
+export function setState(unit: Unit, state: State) {
+    if (unit.state === state) return
+    unit.state = state
+    unit.frame = 0
+    unit.frameMs = 0
 }
 
-function advance(u: Unit, dtMs: number, loop: boolean): boolean {
-    u.frameMs += dtMs
-    while (u.frameMs >= FRAME_MS) {
-        u.frameMs -= FRAME_MS
-        if (u.frame < COLUMNS - 1) u.frame++
-        else if (loop) u.frame = 0
+function advanceAnimationFrame(unit: Unit, msSinceLastFrame: number, loop: boolean): boolean {
+    unit.frameMs += msSinceLastFrame
+    while (unit.frameMs >= FRAME_MS) {
+        unit.frameMs -= FRAME_MS
+        if (unit.frame < COLUMNS - 1) unit.frame++
+        else if (loop) unit.frame = 0
         else return true
     }
     return false
 }
 
-export function nearestAlive(u: Unit, foes: Unit[]): Unit | null {
-    let best: Unit | null = null
-    let bestDist = Infinity
+export function nearestAlive(unit: Unit, foes: Unit[]): Unit | null {
+    let nearestFoe: Unit | null = null
+    let distanceToNearestFoe = Infinity
     for (const foe of foes) {
         if (foe.state === 'dead') continue
-        const dist = Math.hypot(foe.x - u.x, foe.y - u.y)
-        if (dist < bestDist) {
-            best = foe
-            bestDist = dist
+        const distanceToFoe = Math.hypot(foe.x - unit.x, foe.y - unit.y)
+        if (distanceToFoe < distanceToNearestFoe) {
+            nearestFoe = foe
+            distanceToNearestFoe = distanceToFoe
         }
     }
-    return best
+    return nearestFoe
 }
 
-export function updateUnit(u: Unit, dtMs: number, foes: Unit[], onHit: (attacker: Unit, target:
-    Unit) => void) {
-    u.cooldownMs -= dtMs
-    u.cleaveMs -= dtMs
-    const cleave = u.stats.cleave
-    if (u.state === 'dead') {
-        u.deadMs += dtMs
-        advance(u, dtMs, false)
-    } else if (u.state === 'attack' || u.state === 'cleave' || u.state === 'hurt') {
-        const before = u.frame
-        const done = advance(u, dtMs, false)
-        const hit = u.state === 'cleave' && cleave ? cleave.hitFrame : u.stats.hitFrame
-        if (u.state !== 'hurt' && u.target && before < hit && u.frame >= hit) onHit(u, u.target)
-        if (done) setState(u, 'idle')
+export function updateUnit(unit: Unit, msSinceLastFrame: number, foes: Unit[],
+    onHit: (attacker: Unit, target: Unit) => void) {
+    unit.cooldownMs -= msSinceLastFrame
+    unit.cleaveMs -= msSinceLastFrame
+    const cleaveStats = unit.stats.cleaveStats
+    if (unit.state === 'dead') {
+        unit.deadMs += msSinceLastFrame
+        advanceAnimationFrame(unit, msSinceLastFrame, false)
+    } else if (unit.state === 'attack' || unit.state === 'cleave' || unit.state === 'hurt') {
+        const frameBeforeAdvancing = unit.frame
+        const animationFinished = advanceAnimationFrame(unit, msSinceLastFrame, false)
+        const hitFrameForThisState = unit.state === 'cleave' && cleaveStats
+            ? cleaveStats.hitFrame
+            : unit.stats.hitFrame
+        const crossedTheHitFrame = frameBeforeAdvancing < hitFrameForThisState
+            && unit.frame >= hitFrameForThisState
+        if (unit.state !== 'hurt' && unit.target && crossedTheHitFrame) onHit(unit, unit.target)
+        if (animationFinished) setState(unit, 'idle')
     } else {
-        const target = nearestAlive(u, foes)
+        const target = nearestAlive(unit, foes)
         if (!target) {
-            setState(u, 'idle')
+            setState(unit, 'idle')
         } else {
-            const dx = target.x - u.x
-            const dy = target.y - u.y
-            const dist = Math.hypot(dx, dy)
-            u.row = facingRow(dx, dy)
-            if (dist > u.stats.range) {
-                setState(u, 'run')
-                const step = Math.min(dist - u.stats.range, (u.stats.speed * dtMs) / 1000)
-                u.x += (dx / dist) * step
-                u.y += (dy / dist) * step
-            } else if (u.cooldownMs <= 0) {
-                u.target = target
-                u.cooldownMs = u.stats.attackMs
-                const pack = cleave && u.cleaveMs <= 0 &&
-                    foesInRadius(u.x, u.y, foes, cleave.radius).length >= cleave.minFoes
-                if (pack && cleave) {
-                    u.cleaveMs = cleave.cooldownMs
-                    setState(u, 'cleave')
+            const deltaX = target.x - unit.x
+            const deltaY = target.y - unit.y
+            const distanceToFoe = Math.hypot(deltaX, deltaY)
+            unit.row = facingRow(deltaX, deltaY)
+            if (distanceToFoe > unit.stats.range) {
+                setState(unit, 'run')
+                const stepDistance = Math.min(distanceToFoe - unit.stats.range,
+                    (unit.stats.speed * msSinceLastFrame) / 1000)
+                unit.x += (deltaX / distanceToFoe) * stepDistance
+                unit.y += (deltaY / distanceToFoe) * stepDistance
+            } else if (unit.cooldownMs <= 0) {
+                unit.target = target
+                unit.cooldownMs = unit.stats.attackMs
+                const enoughFoesToCleave = cleaveStats && unit.cleaveMs <= 0 &&
+                    foesInRadius(unit.x, unit.y, foes, cleaveStats.radius).length >= cleaveStats.minFoes
+                if (enoughFoesToCleave && cleaveStats) {
+                    unit.cleaveMs = cleaveStats.cooldownMs
+                    setState(unit, 'cleave')
                 } else {
-                    setState(u, 'attack')
+                    setState(unit, 'attack')
                 }
             } else {
-                setState(u, 'idle')
+                setState(unit, 'idle')
             }
         }
-        if (u.state === 'idle' || u.state === 'run') advance(u, dtMs, true)
+        if (unit.state === 'idle' || unit.state === 'run') {
+            advanceAnimationFrame(unit, msSinceLastFrame, true)
+        }
     }
-    u.sprite.texture = u.anims[u.state][u.row][u.frame]
-    u.view.position.set(u.x, u.y)
-    u.view.zIndex = u.y // DEI-016: painter's order, so units in front cover units behind
-    u.bar.setSize(Math.max(0, (u.hp / u.stats.hp) * BAR_W), BAR_H)
-    u.bars.visible = u.state !== 'dead'
+    unit.sprite.texture = unit.animationsByState[unit.state][unit.row][unit.frame]
+    unit.view.position.set(unit.x, unit.y)
+    unit.view.zIndex = unit.y // DEI-016: painter's order, so units in front cover units behind
+    unit.bar.setSize(Math.max(0, (unit.hp / unit.stats.hp) * BAR_W), BAR_H)
+    unit.bars.visible = unit.state !== 'dead'
 }

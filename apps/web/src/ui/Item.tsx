@@ -19,7 +19,7 @@ export function ItemSlot({ item, onClick }: { item: Item | null; onClick?: () =>
 
     if (!item) return <div className="slot slot-empty" />
 
-    const durability = item.durability / item.maxDurability
+    const durabilityFraction = item.durability / item.maxDurability
     return (
         <button
             className={`slot ${RARITY_CLASS[item.rarity]}`}
@@ -30,9 +30,9 @@ export function ItemSlot({ item, onClick }: { item: Item | null; onClick?: () =>
         >
             <img src={iconUrl(item)} alt="" draggable={false} />
             {item.isNew && <span className="new-dot" aria-label="new" />}
-            {durability < 1 && (
+            {durabilityFraction < 1 && (
                 <span className="durability">
-                    <span style={{ width: `${Math.max(0, durability) * 100}%` }} />
+                    <span style={{ width: `${Math.max(0, durabilityFraction) * 100}%` }} />
                 </span>
             )}
             {anchor && <Tooltip item={item} anchor={anchor} />}
@@ -41,8 +41,8 @@ export function ItemSlot({ item, onClick }: { item: Item | null; onClick?: () =>
 }
 
 function Tooltip({ item, anchor }: { item: Item; anchor: Anchor }) {
-    const base = baseById(item.baseId)
-    const broken = item.durability <= 0
+    const baseDefinition = baseById(item.baseId)
+    const isBroken = item.durability <= 0
     return (
         <span
             className="tooltip"
@@ -53,19 +53,20 @@ function Tooltip({ item, anchor }: { item: Item; anchor: Anchor }) {
                 transform: anchor.above ? 'translateY(-100%)' : undefined,
             }}
         >
-            <strong className={RARITY_CLASS[item.rarity]}>{base.name}</strong>
+            <strong className={RARITY_CLASS[item.rarity]}>{baseDefinition.name}</strong>
             <em>
                 item level {item.itemLevel}
-                {base.twoHanded && ' · two-handed'}
-                {base.physical && ` · ${base.physical[0]}–${base.physical[1]} physical`}
+                {baseDefinition.twoHanded && ' · two-handed'}
+                {baseDefinition.physical
+                    && ` · ${baseDefinition.physical[0]}–${baseDefinition.physical[1]} physical`}
             </em>
-            {item.mods.map((mod) => (
-                <span key={mod.modId} className="mod">
-                    <span className="tier">T{mod.tier}</span> {formatMod(mod)}
-                    <span className="affix">{modById(mod.modId).type === 'prefix' ? 'P' : 'S'}</span>
+            {item.mods.map((itemMod) => (
+                <span key={itemMod.modId} className="mod">
+                    <span className="tier">T{itemMod.tier}</span> {formatMod(itemMod)}
+                    <span className="affix">{modById(itemMod.modId).type === 'prefix' ? 'P' : 'S'}</span>
                 </span>
             ))}
-            {broken
+            {isBroken
                 ? <span className="broken">Broken — gives no stats</span>
                 : <span className="dim">durability {Math.floor(item.durability)}/{item.maxDurability}</span>}
             <span className="dim">sells for {sellPrice(item)} gold</span>

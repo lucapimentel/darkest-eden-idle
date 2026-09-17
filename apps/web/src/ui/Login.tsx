@@ -10,9 +10,9 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
-    const [busy, setBusy] = useState(false)
+    const [isSubmitting, setBusy] = useState(false)
 
-    async function submit(event: FormEvent) {
+    async function handleSubmit(event: FormEvent) {
         event.preventDefault()
         setBusy(true)
         setError('')
@@ -24,8 +24,8 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
             // Re-fetch /api/me rather than trusting this response: one code path for "who am I"
             // is one thing to debug.
             onSignedIn()
-        } catch (problem) {
-            setError((problem as Error).message)
+        } catch (failure) {
+            setError((failure as Error).message)
             setBusy(false)
         }
     }
@@ -33,7 +33,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
     return (
         <main className="login">
             <h1>Darkest Eden Idle</h1>
-            <form onSubmit={submit}>
+            <form onSubmit={handleSubmit}>
                 <label>
                     Email
                     <input
@@ -50,7 +50,7 @@ export function Login({ onSignedIn }: { onSignedIn: () => void }) {
                     />
                 </label>
                 {error && <p className="refusal">{error}</p>}
-                <button type="submit" disabled={busy}>
+                <button type="submit" disabled={isSubmitting}>
                     {isSignup ? 'Create account' : 'Enter'}
                 </button>
             </form>

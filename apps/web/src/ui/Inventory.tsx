@@ -23,14 +23,14 @@ export function Inventory({ save, mutate, onClose }: {
 
     // Every action settles a claim first (mutate does that), so rewards always use the stats
     // that earned them. A habit in M2; a correctness requirement from M4 on.
-    const act = (action: (save: SaveState) => ActionResult) => {
+    const runAction = (action: (save: SaveState) => ActionResult) => {
         mutate((draft) => {
-            const outcome = action(draft)
-            setRefusal(outcome.ok ? null : outcome.reason)
+            const actionResult = action(draft)
+            setRefusal(actionResult.ok ? null : actionResult.reason)
         })
     }
 
-    const twoHanded = save.hero.equipped.mainhand
+    const mainHandIsTwoHanded = save.hero.equipped.mainhand
         && baseById(save.hero.equipped.mainhand.baseId).twoHanded
 
     return (
@@ -49,11 +49,11 @@ export function Inventory({ save, mutate, onClose }: {
                                 <div key={slot} className="equipment-slot">
                                     <ItemSlot
                                         item={save.hero.equipped[slot] ?? null}
-                                        onClick={() => act((draft) => unequip(draft, slot))}
+                                        onClick={() => runAction((draft) => unequip(draft, slot))}
                                     />
                                     <span className="slot-name">
                                         {SLOT_LABEL[slot]}
-                                        {slot === 'offhand' && twoHanded && <em> (locked)</em>}
+                                        {slot === 'offhand' && mainHandIsTwoHanded && <em> (locked)</em>}
                                     </span>
                                 </div>
                             ))}
@@ -87,12 +87,12 @@ export function Inventory({ save, mutate, onClose }: {
                                     key={item?.id ?? `empty-${index}`}
                                     onContextMenu={(event) => {
                                         event.preventDefault()
-                                        if (item) act((draft) => sell(draft, item.id))
+                                        if (item) runAction((draft) => sell(draft, item.id))
                                     }}
                                 >
                                     <ItemSlot
                                         item={item}
-                                        onClick={() => item && act((draft) => equip(draft, item.id))}
+                                        onClick={() => item && runAction((draft) => equip(draft, item.id))}
                                     />
                                 </div>
                             ))}
@@ -114,12 +114,12 @@ export function Inventory({ save, mutate, onClose }: {
                                     key={item?.id ?? `overflow-${index}`}
                                     onContextMenu={(event) => {
                                         event.preventDefault()
-                                        if (item) act((draft) => sell(draft, item.id))
+                                        if (item) runAction((draft) => sell(draft, item.id))
                                     }}
                                 >
                                     <ItemSlot
                                         item={item}
-                                        onClick={() => item && act((draft) => rescue(draft, item.id))}
+                                        onClick={() => item && runAction((draft) => rescue(draft, item.id))}
                                     />
                                 </div>
                             ))}
