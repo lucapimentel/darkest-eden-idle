@@ -15,3 +15,210 @@ body {
 canvas {
   display: block;
 }
+
+:root {
+  --normal: #b4aca0;
+  --magic: #6f8fd4;
+  --rare: #b07ad6;
+  --gold: #d9b45e;
+  --danger: #c9694e;
+  --ink: #e8dcc8;
+  --panel: #171311;
+  --edge: #3a2f27;
+}
+
+.rarity-normal { color: var(--normal); }
+.rarity-magic { color: var(--magic); }
+.rarity-rare { color: var(--rare); }
+.dim { opacity: 0.6; }
+.warn { color: var(--danger); }
+
+/* --- HUD: sits over the canvas, never eats a click meant for the scene --- */
+.hud {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  z-index: 1;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+  max-width: 280px;
+}
+
+.hud h1 { margin: 0 0 8px; font-size: 1.3rem; }
+.hud p { margin: 2px 0; }
+.hud small { opacity: 0.6; }
+.hud button { pointer-events: auto; margin-top: 8px; }
+
+.hud .bar {
+  height: 4px;
+  width: 200px;
+  background: #000a;
+  border: 1px solid var(--edge);
+}
+
+.hud .bar span {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+button {
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: #241d18;
+  border: 1px solid var(--edge);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+button:hover { background: #31271f; }
+button.ghost { background: none; opacity: 0.7; }
+
+/* --- Panels --- */
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  background: #000a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  box-shadow: 0 10px 40px #000c;
+  padding: 16px 20px;
+  max-height: 88vh;
+  max-width: min(980px, 94vw);
+  overflow: auto;
+}
+
+.panel.report { max-width: min(560px, 94vw); }
+
+.panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--edge);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.panel h2 { margin: 0; font-size: 1.2rem; }
+
+.panel h3 {
+  margin: 16px 0 6px;
+  font-size: 0.95rem;
+  font-weight: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  display: flex;
+  justify-content: space-between;
+}
+
+.panel-body {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.hint { margin: 0 0 8px; font-size: 0.8rem; opacity: 0.55; }
+.refusal { color: var(--danger); font-size: 0.85rem; }
+
+/* --- Slots --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(10, 48px);
+  gap: 4px;
+}
+
+.slot {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--edge);
+  background: #0f0c0a url('/assets/ui/elements/InventoryItemSlot_1.png') center/cover;
+  cursor: pointer;
+}
+
+.slot-empty { cursor: default; opacity: 0.55; }
+.slot img { width: 100%; height: 100%; object-fit: contain; }
+.slot.rarity-magic { border-color: var(--magic); }
+.slot.rarity-rare { border-color: var(--rare); }
+
+.new-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.durability {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 2px;
+  height: 3px;
+  background: #000b;
+}
+
+.durability span { display: block; height: 100%; background: var(--gold); }
+
+/* --- Tooltip ---
+   Fixed, so the panel's own scroll container cannot clip it; placed from JS (Item.tsx) so it
+   stays inside the viewport. No ancestor may have a transform, or `fixed` would anchor to it. */
+.tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: fixed;
+  z-index: 5;
+  padding: 8px 10px;
+  text-align: left;
+  background: #0b0908;
+  border: 1px solid var(--edge);
+  box-shadow: 0 6px 20px #000c;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.tooltip em { font-style: normal; opacity: 0.55; font-size: 0.75rem; }
+.tooltip .mod { display: flex; gap: 6px; align-items: baseline; }
+.tooltip .tier { color: var(--gold); font-size: 0.7rem; }
+.tooltip .affix { margin-left: auto; opacity: 0.35; font-size: 0.7rem; }
+.tooltip .broken { color: var(--danger); }
+
+/* --- Equipment --- */
+.equipment-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.equipment-slot { display: flex; flex-direction: column; align-items: center; width: 62px; }
+.slot-name { font-size: 0.7rem; opacity: 0.6; text-align: center; margin-top: 3px; }
+.slot-name em { color: var(--danger); font-style: normal; }
+
+.stats { margin: 0; display: grid; grid-template-columns: 1fr; gap: 1px; max-width: 260px; }
+.stats > div { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.stats dt { opacity: 0.6; font-size: 0.85rem; }
+.stats dd { margin: 0; font-size: 0.85rem; }
+
+@media (max-width: 720px) {
+  .grid { grid-template-columns: repeat(6, 48px); }
+}

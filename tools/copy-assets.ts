@@ -1,5 +1,6 @@
 import { dirname, join } from 'node:path'
 import { copyFileSync, mkdirSync, rmSync } from 'node:fs'
+import { BASES } from '../packages/game/src/data/bases.ts'
 
 const SRC = 'assets-src';
 const DEST = 'apps/web/public/assets';
@@ -16,6 +17,14 @@ const ALLOW = [
     ...frames('heroes/effects/projectiles/Arrows/Arrow'),
     'environment/tiles/tiles_brown_01.png',
     'ui/effects/Light.png',
+
+    // M2 UI: PONETI frames, plus the item icons named by packages/game's item bases.
+    'ui/elements/InventoryItemSlot_1.png',
+    'ui/elements/RarityFrame_Gray.png',
+    'ui/elements/RarityFrame_Blue.png',
+    'ui/elements/RarityFrame_Purple.png',
+    'ui/elements/BarLittle_Description.png',
+    ...BASES.map((base) => `icons/items/${base.icon}`),
 ]
 
 // Start clean, so files removed from ALLOW disappear from public/ too

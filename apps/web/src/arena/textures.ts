@@ -48,13 +48,23 @@ async function loadUnit<K extends string>(dir: string, files: Record<K, string>)
     return Object.fromEntries(keys.map((key, index) => [key, anims[index]])) as Record<K, Anim>;
 }
 
+export async function loadFrames(dir: string, count = 15): Promise<Texture[]> {
+    const urls = Array.from({ length: count }, (_, i) => `${dir}/${String(i * 2 + 1).padStart(4,
+        '0')}.png`)
+    const loaded = await Assets.load<Texture>(urls)
+    return urls.map((url) => loaded[url])
+}
+
 export async function loadTextures() {
-    const [knight, warrior, archer, tiles] = await Promise.all([
+    const [knight, warrior, archer, tiles, arrow, swordAoE, light] = await Promise.all([
         loadUnit('/assets/heroes/spritesheets/1Knight', KNIGHT_ANIMS),
         loadUnit('/assets/enemies/undead/spritesheets/6Warrior', ENEMY_ANIMS),
         loadUnit('/assets/enemies/undead/spritesheets/5Archer', ENEMY_ANIMS),
         Assets.load<Texture>('/assets/environment/tiles/tiles_brown_01.png'),
+        loadFrames('/assets/heroes/effects/projectiles/Arrows/Arrow'),
+        loadFrames('/assets/heroes/effects/projectiles/AoE/SwordAoE'),
+        Assets.load<Texture>('/assets/ui/effects/Light.png'),
     ])
 
-    return { knight, warrior, archer, tiles }
+    return { knight, warrior, archer, tiles, arrow, swordAoE, light }
 }
